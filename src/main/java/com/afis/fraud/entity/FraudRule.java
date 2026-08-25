@@ -30,6 +30,21 @@ public class FraudRule {
     protected FraudRule() {
     }
 
+    public static FraudRule create(
+            String ruleCode,
+            String description,
+            Integer riskScore,
+            boolean enabled) {
+
+        FraudRule rule = new FraudRule();
+        rule.setRuleCode(ruleCode);
+        rule.setDescription(description);
+        rule.setRiskScore(riskScore);
+        rule.setEnabled(enabled);
+        rule.setCreatedAt(OffsetDateTime.now());
+        return rule;
+    }
+
     public Long getId() {
         return id;
     }

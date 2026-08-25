@@ -28,6 +28,15 @@ public class Customer {
     protected Customer() {
     }
 
+    public static Customer create(String customerReference, String country, CustomerStatus status) {
+        Customer customer = new Customer();
+        customer.setCustomerReference(customerReference);
+        customer.setCountry(country);
+        customer.setStatus(status != null ? status : CustomerStatus.ACTIVE);
+        customer.setCreatedAt(OffsetDateTime.now());
+        return customer;
+    }
+
     public Long getId() {
         return id;
     }

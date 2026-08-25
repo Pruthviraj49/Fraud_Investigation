@@ -39,6 +39,25 @@ public class Investigation {
     protected Investigation() {
     }
 
+    public static Investigation create(
+            Transaction transaction,
+            InvestigationStatus status,
+            Integer riskScore,
+            RiskLevel riskLevel,
+            String summary) {
+
+        Investigation investigation = new Investigation();
+        investigation.setTransaction(transaction);
+        investigation.setStatus(status != null ? status : InvestigationStatus.PENDING);
+        investigation.setRiskScore(riskScore);
+        investigation.setRiskLevel(riskLevel);
+        investigation.setSummary(summary);
+        OffsetDateTime now = OffsetDateTime.now();
+        investigation.setCreatedAt(now);
+        investigation.setUpdatedAt(now);
+        return investigation;
+    }
+
     public Long getId() {
         return id;
     }

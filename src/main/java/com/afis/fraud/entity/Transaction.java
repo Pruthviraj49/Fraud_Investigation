@@ -44,6 +44,29 @@ public class Transaction {
     protected Transaction() {
     }
 
+    public static Transaction create(
+            String transactionReference,
+            Customer customer,
+            BigDecimal amount,
+            String currency,
+            String merchant,
+            String deviceId,
+            String location,
+            OffsetDateTime transactionTimestamp) {
+
+        Transaction transaction = new Transaction();
+        transaction.setTransactionReference(transactionReference);
+        transaction.setCustomer(customer);
+        transaction.setAmount(amount);
+        transaction.setCurrency(currency);
+        transaction.setMerchant(merchant);
+        transaction.setDeviceId(deviceId);
+        transaction.setLocation(location);
+        transaction.setTransactionTimestamp(transactionTimestamp);
+        transaction.setCreatedAt(OffsetDateTime.now());
+        return transaction;
+    }
+
     public Long getId() {
         return id;
     }
