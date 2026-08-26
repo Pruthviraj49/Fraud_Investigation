@@ -1,10 +1,12 @@
 package com.afis.fraud.service;
 
 import com.afis.fraud.dto.CreateTransactionRequest;
+import com.afis.fraud.dto.TransactionEvent;
 import com.afis.fraud.dto.TransactionResponse;
 import com.afis.fraud.entity.Customer;
 import com.afis.fraud.entity.Transaction;
 import com.afis.fraud.exception.ResourceNotFoundException;
+import com.afis.fraud.kafka.TransactionEventProducer;
 import com.afis.fraud.repository.CustomerRepository;
 import com.afis.fraud.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
@@ -17,13 +19,15 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final CustomerRepository customerRepository;
+    private final TransactionEventProducer transactionEventProducer;
 
     public TransactionService(
             TransactionRepository transactionRepository,
-            CustomerRepository customerRepository) {
+            CustomerRepository customerRepository, TransactionEventProducer transactionEventProducer) {
 
         this.transactionRepository = transactionRepository;
         this.customerRepository = customerRepository;
+        this.transactionEventProducer = transactionEventProducer;
     }
 
     @Transactional
@@ -47,6 +51,19 @@ public class TransactionService {
                 request.getTransactionTimestamp());
 
         Transaction savedTransaction = transactionRepository.save(transaction);
+
+        TransactionEvent event = new TransactionEvent(
+                savedTransaction.getTransactionReference(),
+                savedTransaction.getCustomer()
+                        .getCustomerReference(),
+                savedTransaction.getAmount(),
+                savedTransaction.getCurrency(),
+                savedTransaction.getMerchant(),
+                savedTransaction.getDeviceId(),
+                savedTransaction.getLocation(),
+                savedTransaction.getTransactionTimestamp());
+
+        transactionEventProducer.publish(event);
 
         return toResponse(savedTransaction);
     }
