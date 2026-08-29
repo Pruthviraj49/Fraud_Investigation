@@ -1,6 +1,7 @@
 package com.afis.fraud.config;
 
 import com.afis.fraud.dto.TransactionEvent;
+import com.afis.fraud.kafka.InvestigationDlqProducer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -17,7 +18,9 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
-
+import org.springframework.context.annotation.Bean;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.util.backoff.FixedBackOff;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -51,7 +54,8 @@ public class KafkaConfig {
     }
 
     @Bean
-    public KafkaTemplate<String, TransactionEvent> kafkaTemplate(ProducerFactory<String, TransactionEvent> producerFactory) {
+    public KafkaTemplate<String, TransactionEvent> kafkaTemplate(
+            ProducerFactory<String, TransactionEvent> producerFactory) {
         return new KafkaTemplate<>(producerFactory);
     }
 
@@ -62,7 +66,8 @@ public class KafkaConfig {
         props.put(ConsumerConfig.GROUP_ID_CONFIG, "afis-investigation-group");
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
-        JsonDeserializer<TransactionEvent> jsonDeserializer = new JsonDeserializer<>(TransactionEvent.class, objectMapper);
+        JsonDeserializer<TransactionEvent> jsonDeserializer = new JsonDeserializer<>(TransactionEvent.class,
+                objectMapper);
         jsonDeserializer.setRemoveTypeHeaders(false);
         jsonDeserializer.addTrustedPackages("com.afis.fraud");
 
@@ -75,9 +80,27 @@ public class KafkaConfig {
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, TransactionEvent> kafkaListenerContainerFactory(
             ConsumerFactory<String, TransactionEvent> consumerFactory) {
-        ConcurrentKafkaListenerContainerFactory<String, TransactionEvent> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+        ConcurrentKafkaListenerContainerFactory<String, TransactionEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         return factory;
+    }
+
+    @Bean
+    public DefaultErrorHandler kafkaErrorHandler(
+            InvestigationDlqProducer dlqProducer) {
+
+        FixedBackOff backOff = new FixedBackOff(
+                2000L,
+                4L);
+
+        return new DefaultErrorHandler(
+                (record, exception) -> {
+
+                    TransactionEvent event = (TransactionEvent) record.value();
+
+                    dlqProducer.publish(event);
+
+                },
+                backOff);
     }
 }

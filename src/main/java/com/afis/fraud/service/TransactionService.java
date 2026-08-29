@@ -6,7 +6,8 @@ import com.afis.fraud.dto.TransactionResponse;
 import com.afis.fraud.entity.Customer;
 import com.afis.fraud.entity.Transaction;
 import com.afis.fraud.exception.ResourceNotFoundException;
-import com.afis.fraud.kafka.TransactionEventProducer;
+import com.afis.fraud.outbox.OutboxEvent;
+import com.afis.fraud.outbox.OutboxEventService;
 import com.afis.fraud.repository.CustomerRepository;
 import com.afis.fraud.repository.TransactionRepository;
 import org.springframework.stereotype.Service;
@@ -17,103 +18,106 @@ import java.util.UUID;
 @Service
 public class TransactionService {
 
-    private final TransactionRepository transactionRepository;
-    private final CustomerRepository customerRepository;
-    private final TransactionEventProducer transactionEventProducer;
+        private final TransactionRepository transactionRepository;
+        private final CustomerRepository customerRepository;
+        // private final TransactionEventProducer transactionEventProducer;
+        private final OutboxEventService outboxEventService;
 
-    public TransactionService(
-            TransactionRepository transactionRepository,
-            CustomerRepository customerRepository, TransactionEventProducer transactionEventProducer) {
+        public TransactionService(
+                        TransactionRepository transactionRepository,
+                        CustomerRepository customerRepository, OutboxEventService outboxEventService) {
 
-        this.transactionRepository = transactionRepository;
-        this.customerRepository = customerRepository;
-        this.transactionEventProducer = transactionEventProducer;
-    }
+                this.transactionRepository = transactionRepository;
+                this.customerRepository = customerRepository;
+                this.outboxEventService = outboxEventService;
+        }
 
-    @Transactional
-    public TransactionResponse createTransaction(
-            CreateTransactionRequest request) {
+        @Transactional
+        public TransactionResponse createTransaction(
+                        CreateTransactionRequest request) {
 
-        Customer customer = customerRepository
-                .findByCustomerReference(request.getCustomerReference())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Customer not found: "
-                                + request.getCustomerReference()));
+                Customer customer = customerRepository
+                                .findByCustomerReference(request.getCustomerReference())
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Customer not found: "
+                                                                + request.getCustomerReference()));
 
-        Transaction transaction = Transaction.create(
-                generateTransactionReference(),
-                customer,
-                request.getAmount(),
-                request.getCurrency(),
-                request.getMerchant(),
-                request.getDeviceId(),
-                request.getLocation(),
-                request.getTransactionTimestamp());
+                Transaction transaction = Transaction.create(
+                                generateTransactionReference(),
+                                customer,
+                                request.getAmount(),
+                                request.getCurrency(),
+                                request.getMerchant(),
+                                request.getDeviceId(),
+                                request.getLocation(),
+                                request.getTransactionTimestamp());
 
-        Transaction savedTransaction = transactionRepository.save(transaction);
+                Transaction savedTransaction = transactionRepository.save(transaction);
 
-        TransactionEvent event = new TransactionEvent(
-                savedTransaction.getTransactionReference(),
-                savedTransaction.getCustomer()
-                        .getCustomerReference(),
-                savedTransaction.getAmount(),
-                savedTransaction.getCurrency(),
-                savedTransaction.getMerchant(),
-                savedTransaction.getDeviceId(),
-                savedTransaction.getLocation(),
-                savedTransaction.getTransactionTimestamp());
+                TransactionEvent event = new TransactionEvent(
+                                savedTransaction.getTransactionReference(),
+                                savedTransaction.getCustomer()
+                                                .getCustomerReference(),
+                                savedTransaction.getAmount(),
+                                savedTransaction.getCurrency(),
+                                savedTransaction.getMerchant(),
+                                savedTransaction.getDeviceId(),
+                                savedTransaction.getLocation(),
+                                savedTransaction.getTransactionTimestamp());
 
-        transactionEventProducer.publish(event);
+                OutboxEvent outboxEvent = outboxEventService.createTransactionEvent(event);
 
-        return toResponse(savedTransaction);
-    }
+                outboxEventService.save(outboxEvent);
 
-    @Transactional(readOnly = true)
-    public TransactionResponse getTransaction(
-            String transactionReference) {
+                return toResponse(savedTransaction);
+        }
 
-        Transaction transaction = transactionRepository
-                .findByTransactionReference(transactionReference)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Transaction not found: "
-                                + transactionReference));
+        @Transactional(readOnly = true)
+        public TransactionResponse getTransaction(
+                        String transactionReference) {
 
-        return toResponse(transaction);
-    }
+                Transaction transaction = transactionRepository
+                                .findByTransactionReference(transactionReference)
+                                .orElseThrow(() -> new ResourceNotFoundException(
+                                                "Transaction not found: "
+                                                                + transactionReference));
 
-    private String generateTransactionReference() {
+                return toResponse(transaction);
+        }
 
-        return "TXN-" +
-                UUID.randomUUID()
-                        .toString()
-                        .substring(0, 8)
-                        .toUpperCase();
-    }
+        private String generateTransactionReference() {
 
-    private TransactionResponse toResponse(
-            Transaction transaction) {
+                return "TXN-" +
+                                UUID.randomUUID()
+                                                .toString()
+                                                .substring(0, 8)
+                                                .toUpperCase();
+        }
 
-        TransactionResponse response = new TransactionResponse();
+        private TransactionResponse toResponse(
+                        Transaction transaction) {
 
-        response.setTransactionReference(
-                transaction.getTransactionReference());
+                TransactionResponse response = new TransactionResponse();
 
-        response.setCustomerReference(
-                transaction.getCustomer()
-                        .getCustomerReference());
+                response.setTransactionReference(
+                                transaction.getTransactionReference());
 
-        response.setAmount(transaction.getAmount());
-        response.setCurrency(transaction.getCurrency());
-        response.setMerchant(transaction.getMerchant());
-        response.setDeviceId(transaction.getDeviceId());
-        response.setLocation(transaction.getLocation());
+                response.setCustomerReference(
+                                transaction.getCustomer()
+                                                .getCustomerReference());
 
-        response.setTransactionTimestamp(
-                transaction.getTransactionTimestamp());
+                response.setAmount(transaction.getAmount());
+                response.setCurrency(transaction.getCurrency());
+                response.setMerchant(transaction.getMerchant());
+                response.setDeviceId(transaction.getDeviceId());
+                response.setLocation(transaction.getLocation());
 
-        response.setCreatedAt(
-                transaction.getCreatedAt());
+                response.setTransactionTimestamp(
+                                transaction.getTransactionTimestamp());
 
-        return response;
-    }
+                response.setCreatedAt(
+                                transaction.getCreatedAt());
+
+                return response;
+        }
 }
