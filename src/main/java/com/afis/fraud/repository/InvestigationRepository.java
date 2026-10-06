@@ -9,4 +9,9 @@ import java.util.List;
 public interface InvestigationRepository extends JpaRepository<Investigation, Long> {
 
     List<Investigation> findByStatus(InvestigationStatus status);
+
+    boolean existsByTransactionId(Long transactionId);
 }
+
+
+

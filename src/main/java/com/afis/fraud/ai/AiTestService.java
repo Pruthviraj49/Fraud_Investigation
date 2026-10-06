@@ -16,6 +16,7 @@ public class AiTestService {
     public String test() {
 
         return fraudAssistant.investigate(
-                "Investigate transaction TXN-68998930");
+                "Investigate transaction TXN-68998930")
+                .summary();
     }
 }
